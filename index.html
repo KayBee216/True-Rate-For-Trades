@@ -308,14 +308,9 @@ select.big {
   <div class="tagline">Know what your work really costs. Price from there.</div>
 </header>
 
-<nav class="tabs">
-  <button id="tab-rate" class="active" onclick="showTab('rate')">Your Rate</button>
-  <button id="tab-job" onclick="showTab('job')">Price a Job</button>
-</nav>
-
 <main>
-  <section id="view-rate"></section>
-  <section id="view-job" hidden></section>
+  <section id="view-rate" hidden></section>
+  <section id="view-job"></section>
 </main>
 
 <script>
@@ -551,13 +546,16 @@ const MARGIN_PRESETS = [
 const viewRate = document.getElementById("view-rate");
 const viewJob  = document.getElementById("view-job");
 
-function showTab(name) {
-  document.getElementById("tab-rate").classList.toggle("active", name === "rate");
-  document.getElementById("tab-job").classList.toggle("active", name === "job");
-  viewRate.hidden = name !== "rate";
-  viewJob.hidden  = name !== "job";
-  if (name === "rate") renderRateTab();
-  else renderJobTab();
+function goJob() {
+  viewRate.hidden = true;
+  viewJob.hidden = false;
+  renderJobTab();
+  window.scrollTo(0, 0);
+}
+function goRate() {
+  viewJob.hidden = true;
+  viewRate.hidden = false;
+  renderRateTab();
   window.scrollTo(0, 0);
 }
 
@@ -587,7 +585,10 @@ function startWizard() {
   wizardActive = true;
   wizardStep = 0;
   wizardDraft = rateInputs ? { ...rateInputs } : {};
+  viewJob.hidden = true;
+  viewRate.hidden = false;
   renderWizardStep();
+  window.scrollTo(0, 0);
 }
 
 function draftDisplayValue(step) {
@@ -747,7 +748,7 @@ function nextStep() {
   else finishWizard();
 }
 function prevStep() { wizardStep--; renderWizardStep(); }
-function cancelWizard() { wizardActive = false; renderRateTab(); }
+function cancelWizard() { wizardActive = false; pendingJob = null; goJob(); }
 
 function finishWizard() {
   rateInputs = { ...wizardDraft };
@@ -759,7 +760,17 @@ function finishWizard() {
   saveState("truerate.result", rateResult);
   wizardActive = false;
   TrueRateAdvisor.onEvent({ type: "rate_calculated", data: { ...rateInputs, ...rateResult } });
-  renderRateResult();
+  // If the rate setup was triggered by a job they were trying to price,
+  // drop them back into that job and run it now.
+  if (pendingJob) {
+    const p = pendingJob;
+    pendingJob = null;
+    jobMode = p.mode;
+    goJob();
+    runJobPrice(p.type, p.hours, p.materialsCents, p.theirPriceCents, p.mode);
+    return;
+  }
+  goRate();
 }
 
 function renderRateResult() {
@@ -798,20 +809,30 @@ function renderRateResult() {
       <p class="note">Notice your pay is the biggest line up there. That is on purpose. Most owners leave their own pay out and take whatever is left. From here on, every job you price carries its share of paying you. That is how it should have worked all along.</p>
       <p class="note">If your current rate is lower than the number above, nothing is wrong with you. You set your rate before anyone showed you this math. Now you have it.</p>
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="showTab('job')">Price a job with this rate</button>
+        <button class="btn btn-primary" onclick="goJob()">Back to pricing a job</button>
         <button class="btn btn-ghost" onclick="startWizard()">Change my numbers</button>
       </div>
     </div>`;
 }
 
-/* ---------- JOB TAB ---------- */
+/* ---------- JOB TAB (home screen) ---------- */
 const JOB_TYPES = ["Service call", "Repair", "Installation", "Maintenance", "Emergency call", "Other"];
 let lastJob = null;
-let jobMode = "build"; // "build" | "check" | "flat"
+let jobMode = "flat";   // "flat" | "check" | "build". flat leads because it is how owners already think
+let pendingJob = null;  // set when a price action triggers the one-time rate setup
 
 function setJobMode(mode) {
   jobMode = mode;
   renderJobTab();
+}
+
+// Small status line at the top of every mode. Shows the rate if set,
+// or a warm one-line heads-up if this is their first time.
+function rateStatusHtml() {
+  if (rateResult) {
+    return `<p class="lead-note">Based on your rate of ${fmtCents(rateResult.loadedRateCents)} an hour. <a href="#" onclick="goRate();return false;" style="color:var(--blueprint);font-weight:700;text-decoration:none">Change it</a></p>`;
+  }
+  return `<p class="lead-note">First time here? When you run the numbers, I will ask you nine quick questions to learn what your work costs you. Three minutes, one time. After that this is instant.</p>`;
 }
 
 function jobInputsHtml(j) {
@@ -840,38 +861,36 @@ function jobInputsHtml(j) {
 }
 
 function renderJobTab() {
-  if (!rateResult) {
-    viewJob.innerHTML = `
-      <div class="card locked">
-        <div class="icon">&#128274;</div>
-        <h2>First, find your rate</h2>
-        <p class="help">Job prices here get built on what your work really costs you. That takes three minutes on the first tab, one time. After that, every job price stands on solid ground instead of a guess.</p>
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="showTab('rate')">Find my rate</button>
-        </div>
-      </div>`;
-    return;
-  }
   const j = lastJob;
   const seg = `
     <div class="seg">
-      <button class="${jobMode === "build" ? "active" : ""}" onclick="setJobMode('build')">Build a price</button>
-      <button class="${jobMode === "check" ? "active" : ""}" onclick="setJobMode('check')">Check a price</button>
       <button class="${jobMode === "flat" ? "active" : ""}" onclick="setJobMode('flat')">Flat rate</button>
+      <button class="${jobMode === "check" ? "active" : ""}" onclick="setJobMode('check')">Check a price</button>
+      <button class="${jobMode === "build" ? "active" : ""}" onclick="setJobMode('build')">Build a price</button>
     </div>`;
 
   let body;
-  if (jobMode === "build") {
+  if (jobMode === "flat") {
     body = `
-      <h2>Build a price from scratch</h2>
-      <p class="lead-note">Tell me the job. I will hand you the price that protects what you keep.</p>
+      <h2>Your flat rate for this job</h2>
+      <p class="lead-note">A lot of owners price by the job, not the hour. A water heater is a water heater. Put in what you charge for it and I will work backward to show you what that price is really earning you.</p>
+      ${rateStatusHtml()}
+      <div class="field" style="margin-top:4px">
+        <label for="check-price">Your set price for this kind of job</label>
+        <div class="input-wrap" style="margin:0">
+          <span class="prefix">$</span>
+          <input id="check-price" class="big has-prefix" type="text" inputmode="decimal" placeholder="450">
+        </div>
+      </div>
+      <p class="lead-note">Two quick things so I can check it:</p>
       ${jobInputsHtml(j)}
       <div class="field-error" id="job-error"></div>
-      <button class="btn btn-primary" onclick="priceJob('build')">Build my price</button>`;
+      <button class="btn btn-primary" onclick="priceJob('flat')">Show me what it really earns</button>`;
   } else if (jobMode === "check") {
     body = `
       <h2>Check a price you have in mind</h2>
       <p class="lead-note">Got a number for this one job already? Put it in and I will tell you straight if it is a good call.</p>
+      ${rateStatusHtml()}
       <div class="field" style="margin-top:4px">
         <label for="check-price">What are you thinking of charging?</label>
         <div class="input-wrap" style="margin:0">
@@ -884,37 +903,30 @@ function renderJobTab() {
       <button class="btn btn-primary" onclick="priceJob('check')">Tell me if it is a good call</button>`;
   } else {
     body = `
-      <h2>Your flat rate for this job</h2>
-      <p class="lead-note">A lot of owners price by the job, not the hour. A water heater is a water heater. Put in what you charge for it and I will work backward to show you what that price is really earning you.</p>
-      <div class="field" style="margin-top:4px">
-        <label for="check-price">Your set price for this kind of job</label>
-        <div class="input-wrap" style="margin:0">
-          <span class="prefix">$</span>
-          <input id="check-price" class="big has-prefix" type="text" inputmode="decimal" placeholder="450">
-        </div>
-      </div>
-      <p class="lead-note">Two quick things so I can check it:</p>
+      <h2>Build a price from scratch</h2>
+      <p class="lead-note">Not sure what to charge? Tell me the job and I will hand you the price that protects what you keep.</p>
+      ${rateStatusHtml()}
       ${jobInputsHtml(j)}
       <div class="field-error" id="job-error"></div>
-      <button class="btn btn-primary" onclick="priceJob('flat')">Show me what it really earns</button>`;
+      <button class="btn btn-primary" onclick="priceJob('build')">Build my price</button>`;
   }
 
   viewJob.innerHTML = `<div class="card">${seg}${body}</div><div id="job-result"></div>`;
 }
 
-function priceJob(mode) {
+// Reads and validates the form. Returns parsed values or null (after showing an error).
+function readJobForm(mode) {
+  const errEl = document.getElementById("job-error");
   const type = document.getElementById("job-type").value;
   const hoursRaw = document.getElementById("job-hours").value.replace(/[,\s]/g, "");
   const hours = parseFloat(hoursRaw);
   const materialsCents = dollarsToCents(document.getElementById("job-materials").value || "0");
-  const errEl = document.getElementById("job-error");
   if (!/^\d*\.?\d*$/.test(hoursRaw) || isNaN(hours) || hours <= 0) {
-    errEl.textContent = "Enter the hours as a number above zero, like 3 or 3.5."; return;
+    errEl.textContent = "Enter the hours as a number above zero, like 3 or 3.5."; return null;
   }
   if (isNaN(materialsCents)) {
-    errEl.textContent = "Enter the parts cost in dollars, numbers only. Zero is fine."; return;
+    errEl.textContent = "Enter the parts cost in dollars, numbers only. Zero is fine."; return null;
   }
-  // check and flat are both reverse math: the owner gives the price, we grade it.
   const reverse = (mode === "check" || mode === "flat");
   let theirPriceCents = null;
   if (reverse) {
@@ -923,17 +935,38 @@ function priceJob(mode) {
       errEl.textContent = mode === "flat"
         ? "Enter your flat price for this job, in dollars."
         : "Enter the price you had in mind, in dollars.";
-      return;
+      return null;
     }
   }
   errEl.textContent = "";
+  return { type, hours, materialsCents, theirPriceCents, mode };
+}
+
+// Entry point from every mode's button.
+function priceJob(mode) {
+  const form = readJobForm(mode);
+  if (!form) return;
+  // The one-time gate: if we do not know their cost yet, run the rate
+  // setup now, holding their job inputs, then come right back and finish.
+  if (!rateResult) {
+    pendingJob = form;
+    startWizard();
+    return;
+  }
+  runJobPrice(form.type, form.hours, form.materialsCents, form.theirPriceCents, form.mode);
+}
+
+// Does the math and renders. Safe to call only once rateResult exists.
+function runJobPrice(type, hours, materialsCents, theirPriceCents, mode) {
+  const reverse = (mode === "check" || mode === "flat");
   const marginBp = rateInputs.targetMarginBp;
   const costCents = jobCostCents(materialsCents, hours, rateResult.loadedRateCents);
   const priceCents = jobPriceCents(materialsCents, hours, rateResult.loadedRateCents, marginBp);
   lastJob = { type, hours, materialsCents, costCents, priceCents };
   TrueRateAdvisor.onEvent({ type: "job_priced", data: { ...lastJob, marginBp, mode } });
   renderJobResult(reverse ? theirPriceCents : priceCents, mode);
-  document.getElementById("job-result").scrollIntoView({ behavior: "smooth", block: "start" });
+  const res = document.getElementById("job-result");
+  if (res) res.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderJobResult(currentPriceCents, mode) {
@@ -1034,7 +1067,7 @@ function overridePrice() {
 }
 
 /* ---------- boot ---------- */
-renderRateTab();
+goJob();
 </script>
 </body>
 </html>
