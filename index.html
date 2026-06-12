@@ -278,6 +278,33 @@ select.big {
   line-height: 1.2;
 }
 .seg button.active { background: var(--paper); color: var(--blueprint); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.welcome-lead { font-size: 16px; color: var(--ink-soft); margin-bottom: 4px; }
+.choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #FBFCFC;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 17px;
+  margin-top: 12px;
+}
+.choice:active { border-color: var(--blueprint); }
+.choice .c-title { font-size: 17px; font-weight: 700; color: var(--ink); }
+.choice .c-sub { font-size: 14px; color: var(--ink-soft); margin-top: 3px; line-height: 1.4; }
+.choice .badge {
+  float: right;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--blueprint);
+  background: #E5EEF8;
+  border-radius: 20px;
+  padding: 3px 9px;
+  margin-top: 1px;
+}
+.choice.lead-choice { border-color: var(--blueprint); }
 .lead-note {
   font-size: 14px;
   color: var(--ink-soft);
@@ -472,6 +499,8 @@ function loadState(key) {
 
 let rateInputs = loadState("truerate.inputs") || null;
 let rateResult = loadState("truerate.result") || null;
+// Welcome shows only the very first time, or until they have set a rate.
+let hasSeenWelcome = loadState("truerate.seenWelcome") === true;
 let wizardStep = 0;
 let wizardDraft = {};
 
@@ -861,12 +890,17 @@ function jobInputsHtml(j) {
 }
 
 function renderJobTab() {
+  // First visit, before any rate is set: orient them. One screen, once.
+  if (!hasSeenWelcome && !rateResult) {
+    renderWelcome();
+    return;
+  }
   const j = lastJob;
   const seg = `
     <div class="seg">
-      <button class="${jobMode === "flat" ? "active" : ""}" onclick="setJobMode('flat')">Flat rate</button>
-      <button class="${jobMode === "check" ? "active" : ""}" onclick="setJobMode('check')">Check a price</button>
-      <button class="${jobMode === "build" ? "active" : ""}" onclick="setJobMode('build')">Build a price</button>
+      <button class="${jobMode === "flat" ? "active" : ""}" onclick="setJobMode('flat')">I charge a flat price</button>
+      <button class="${jobMode === "check" ? "active" : ""}" onclick="setJobMode('check')">I have a price in mind</button>
+      <button class="${jobMode === "build" ? "active" : ""}" onclick="setJobMode('build')">Help me figure it out</button>
     </div>`;
 
   let body;
@@ -903,7 +937,7 @@ function renderJobTab() {
       <button class="btn btn-primary" onclick="priceJob('check')">Tell me if it is a good call</button>`;
   } else {
     body = `
-      <h2>Build a price from scratch</h2>
+      <h2>Let's figure out the price together</h2>
       <p class="lead-note">Not sure what to charge? Tell me the job and I will hand you the price that protects what you keep.</p>
       ${rateStatusHtml()}
       ${jobInputsHtml(j)}
@@ -912,6 +946,43 @@ function renderJobTab() {
   }
 
   viewJob.innerHTML = `<div class="card">${seg}${body}</div><div id="job-result"></div>`;
+}
+
+// First-run welcome. Frames the whole tool in one sentence, then turns the
+// three modes into a plain-language "which of these is you" choice.
+function renderWelcome() {
+  viewJob.innerHTML = `
+    <div class="card">
+      <h1>Is your price actually making you money?</h1>
+      <p class="welcome-lead">TrueRate takes any job price and tells you straight whether it covers your costs and pays you, or quietly loses you money.</p>
+      <p class="welcome-lead" style="margin-top:10px;margin-bottom:16px">To start, pick the one that sounds like you:</p>
+
+      <button class="choice lead-choice" onclick="chooseMode('flat')">
+        <span class="badge">Most owners</span>
+        <span class="c-title">I charge a flat price for a job</span>
+        <div class="c-sub">Like "a water heater is $450." You price by the job, not the hour. I will show you what that price really earns you.</div>
+      </button>
+
+      <button class="choice" onclick="chooseMode('check')">
+        <span class="c-title">I have a price in mind</span>
+        <div class="c-sub">You are looking at one job and have a number already. I will tell you if it is a good call.</div>
+      </button>
+
+      <button class="choice" onclick="chooseMode('build')">
+        <span class="c-title">I am not sure what to charge</span>
+        <div class="c-sub">Tell me the job and I will build you a price from the ground up.</div>
+      </button>
+
+      <p class="note" style="margin-top:18px">Quick heads up: the first time, I will ask nine short questions about what your business costs to run. Three minutes, one time. After that, every price check is instant.</p>
+    </div>`;
+}
+
+function chooseMode(mode) {
+  hasSeenWelcome = true;
+  saveState("truerate.seenWelcome", true);
+  jobMode = mode;
+  renderJobTab();
+  window.scrollTo(0, 0);
 }
 
 // Reads and validates the form. Returns parsed values or null (after showing an error).
