@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TrueRate</title>
+<style>
+/* ============================================================
+   TRUERATE DESIGN TOKENS
+   Blueprint blue on shop-floor gray. Safety orange is reserved
+   for warnings only. Green is reserved for healthy.
+   ============================================================ */
+:root {
+  --ink: #16222E;
+  --ink-soft: #51616F;
+  --blueprint: #1B4F8A;
+  --blueprint-deep: #143C6B;
+  --paper: #FFFFFF;
+  --floor: #EFF2F1;
+  --line: #D8DEDC;
+  --safety: #C75300;
+  --safety-bg: #FCEFE4;
+  --healthy: #1F6B43;
+  --healthy-bg: #E8F3EC;
+  --ticket-edge: #C9D2D0;
+  --radius: 14px;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--floor);
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.45;
+  min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; }
+
+header {
+  background: var(--ink);
+  color: #fff;
+  padding: 18px 20px 16px;
+}
+.wordmark { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
+.wordmark span { color: #7FB3E8; }
+.tagline { font-size: 13px; color: #AEBDC9; margin-top: 2px; }
+
+nav.tabs {
+  display: flex;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+nav.tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 15px 8px 13px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 3px solid transparent;
+}
+nav.tabs button.active { color: var(--blueprint); border-bottom-color: var(--blueprint); }
+nav.tabs button:focus-visible,
+.btn:focus-visible, .pick:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid #7FB3E8;
+  outline-offset: 2px;
+}
+
+main { max-width: 520px; margin: 0 auto; padding: 20px 16px 110px; }
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  margin-bottom: 16px;
+}
+h1 { font-size: 24px; font-weight: 800; line-height: 1.2; margin-bottom: 10px; }
+h2 { font-size: 20px; font-weight: 700; line-height: 1.25; margin-bottom: 8px; }
+p.help { color: var(--ink-soft); font-size: 15px; margin-bottom: 6px; }
+p + p { margin-top: 8px; }
+
+.progress { display: flex; gap: 5px; margin-bottom: 18px; }
+.progress i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.progress i.done { background: var(--blueprint); }
+.step-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+.input-wrap { position: relative; margin: 18px 0 6px; }
+.input-wrap .prefix, .input-wrap .suffix {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+.input-wrap .prefix { left: 16px; }
+.input-wrap .suffix { right: 16px; }
+input.big {
+  width: 100%;
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--mono);
+  padding: 14px 16px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: #FBFCFC;
+  color: var(--ink);
+  -moz-appearance: textfield;
+}
+input.big::-webkit-outer-spin-button,
+input.big::-webkit-inner-spin-button { -webkit-appearance: none; }
+input.big.has-prefix { padding-left: 42px; }
+input.big.has-suffix { padding-right: 48px; }
+input.big:focus { border-color: var(--blueprint); }
+.field-error {
+  color: var(--safety);
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 20px;
+  margin-top: 6px;
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+}
+.btn-primary { background: var(--blueprint); color: #fff; }
+.btn-primary:active { background: var(--blueprint-deep); }
+.btn-ghost {
+  background: none;
+  color: var(--blueprint);
+  border: 2px solid var(--line);
+  margin-top: 10px;
+}
+.btn-row { margin-top: 20px; }
+
+/* margin picker cards */
+.pick {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #FBFCFC;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 15px 16px;
+  margin-top: 10px;
+}
+.pick:active { border-color: var(--blueprint); }
+.pick .pick-title { font-size: 17px; font-weight: 700; }
+.pick .pick-title em { font-style: normal; color: var(--blueprint); }
+.pick .pick-sub { font-size: 14px; color: var(--ink-soft); margin-top: 2px; }
+.pick.recommended { border-color: var(--blueprint); }
+.pick .badge {
+  float: right;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--blueprint);
+  background: #E5EEF8;
+  border-radius: 20px;
+  padding: 3px 9px;
+  margin-top: 2px;
+}
+
+.ticket {
+  background: var(--paper);
+  border: 1px solid var(--ticket-edge);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.ticket-head {
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+}
+.ticket-head .stamp { color: #7FB3E8; }
+.ticket-body { padding: 20px; }
+.ticket-perf { border-top: 2px dashed var(--ticket-edge); margin: 16px -20px; }
+.rate-line { margin-bottom: 4px; }
+.rate-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.rate-value {
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.1;
+}
+.rate-value small { font-size: 17px; font-weight: 600; color: var(--ink-soft); letter-spacing: 0; }
+.breakdown { width: 100%; border-collapse: collapse; font-size: 15px; }
+.breakdown td { padding: 7px 0; border-bottom: 1px solid var(--floor); }
+.breakdown td:last-child { text-align: right; font-family: var(--mono); font-weight: 600; }
+.breakdown tr.total td { border-bottom: none; font-weight: 700; padding-top: 12px; }
+
+.status { border-radius: 12px; padding: 16px; font-size: 15px; margin-top: 16px; }
+.status strong { display: block; margin-bottom: 6px; font-size: 16px; }
+.status.warn { background: var(--safety-bg); color: #7A3300; border: 1px solid #EAC4A4; }
+.status.warn strong { color: var(--safety); }
+.status.good { background: var(--healthy-bg); color: #14492E; border: 1px solid #BCDCC8; }
+.status.good strong { color: var(--healthy); }
+.note {
+  font-size: 14px;
+  color: var(--ink-soft);
+  background: var(--floor);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 14px;
+}
+
+.field { margin-bottom: 18px; }
+.field label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 7px; }
+select.big {
+  width: 100%;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 14px 16px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: #FBFCFC;
+  color: var(--ink);
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='9'><path d='M1 1l6 6 6-6' stroke='%2351616F' stroke-width='2' fill='none'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+.seg {
+  display: flex;
+  background: var(--floor);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+.seg button {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 10px 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  border-radius: 9px;
+  line-height: 1.2;
+}
+.seg button.active { background: var(--paper); color: var(--blueprint); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.lead-note {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: -6px 0 14px;
+}
+.quote-box {
+  font-size: 15px;
+  background: var(--floor);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 14px;
+  white-space: pre-wrap;
+}
+.locked { text-align: center; padding: 36px 20px; }
+.locked .icon { font-size: 34px; margin-bottom: 10px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .card, .ticket { animation: rise .25s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">True<span>Rate</span></div>
+  <div class="tagline">Know what your work really costs. Price from there.</div>
+</header>
+
+<nav class="tabs">
+  <button id="tab-rate" class="active" onclick="showTab('rate')">Your Rate</button>
+  <button id="tab-job" onclick="showTab('job')">Price a Job</button>
+</nav>
+
+<main>
+  <section id="view-rate"></section>
+  <section id="view-job" hidden></section>
+</main>
+
+<script>
+/* ************************************************************
+ * ************************************************************
+ *
+ *   PRICING MATH
+ *   All money is stored and computed as INTEGER CENTS.
+ *   No floats touch currency values. Percentages are handled
+ *   as basis points (1% = 100 bp) so division happens once,
+ *   at the final rounding step.
+ *
+ *   Margin and markup are different concepts:
+ *     margin = profit / price
+ *     markup = profit / cost
+ *   A 50% margin equals a 100% markup. The two are never
+ *   mixed anywhere in this section.
+ *
+ * ************************************************************
+ * ************************************************************/
+
+// A residential service job below this share-kept gets a warning.
+const MARGIN_WARNING_THRESHOLD_BP = 4500;   // 45.00% in basis points
+const MAX_TARGET_MARGIN_BP        = 7500;   // 75% cap so the math stays sane
+const DEFAULT_PAYROLL_TAX_BP      = 765;    // 7.65% employer FICA
+const DEFAULT_TARGET_MARGIN_BP    = 5500;   // recommended when the owner has no number
+
+// ---- conversions ----
+
+function dollarsToCents(str) {
+  const clean = String(str).replace(/[$,\s]/g, "");
+  if (clean === "" || !/^\d*\.?\d*$/.test(clean) || clean === ".") return NaN;
+  const parts = clean.split(".");
+  const whole = parseInt(parts[0] || "0", 10);
+  const fracStr = ((parts[1] || "") + "00").slice(0, 2);
+  return whole * 100 + parseInt(fracStr, 10);
+}
+
+function fmtCents(cents) {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  const dollars = Math.floor(abs / 100);
+  const rem = String(abs % 100).padStart(2, "0");
+  return sign + "$" + dollars.toLocaleString("en-US") + "." + rem;
+}
+
+function percentToBp(str) {
+  const clean = String(str).replace(/[%\s]/g, "");
+  if (clean === "" || !/^\d*\.?\d*$/.test(clean) || clean === ".") return NaN;
+  return Math.round(parseFloat(clean) * 100);
+}
+
+// Basis points shown to the user as "cents of every dollar"
+function fmtBpCents(bp) {
+  return Math.round(bp / 100) + " cents";
+}
+function fmtBp(bp) {
+  return (bp / 100).toLocaleString("en-US", { maximumFractionDigits: 1 }) + "%";
+}
+
+// ---- core calculations (all cents in, cents out) ----
+
+function payrollTaxCents(wagesCents, taxBp) {
+  return Math.round(wagesCents * taxBp / 10000);
+}
+
+// Owner pay is deliberately INCLUDED as an annual cost. Most
+// trades owners treat their pay as the leftovers; TrueRate's
+// position is that the owner's pay is a cost every job must
+// carry, or the rate is built on a fiction.
+function totalLoadedCostCents(c) {
+  return c.wages
+    + payrollTaxCents(c.wages, c.payrollTaxBp)
+    + c.workersComp
+    + c.liability
+    + c.vehicle
+    + c.tools
+    + c.overhead;
+}
+
+function loadedHourlyRateCents(totalAnnualCents, billableHours) {
+  return Math.round(totalAnnualCents / billableHours);
+}
+
+// price = cost / (1 - margin)
+function minBillableRateCents(loadedRateCents, targetMarginBp) {
+  return Math.round(loadedRateCents * 10000 / (10000 - targetMarginBp));
+}
+
+function jobCostCents(materialsCents, laborHours, loadedRateCents) {
+  return materialsCents + Math.round(laborHours * loadedRateCents);
+}
+function jobPriceCents(materialsCents, laborHours, loadedRateCents, targetMarginBp) {
+  const cost = jobCostCents(materialsCents, laborHours, loadedRateCents);
+  return Math.round(cost * 10000 / (10000 - targetMarginBp));
+}
+
+function grossMarginBp(priceCents, costCents) {
+  if (priceCents <= 0) return NaN;
+  return Math.round((priceCents - costCents) * 10000 / priceCents);
+}
+
+// markup = margin / (1 - margin)
+function marginToMarkupBp(marginBp) {
+  return Math.round(marginBp * 10000 / (10000 - marginBp));
+}
+
+/* ************************************************************
+ *   END PRICING MATH
+ * ************************************************************/
+
+
+/* ************************************************************
+ *   AI ADVISOR INTEGRATION POINT (STUB)
+ *
+ *   The TrueRate advisor attaches here in a later version.
+ *   It will receive structured pricing events and return
+ *   plain-language guidance in the TrueRate voice (see the
+ *   TrueRate system prompt, v1.0).
+ *
+ *   Contract:
+ *     TrueRateAdvisor.onEvent(event) -> Promise<string|null>
+ *     event = {
+ *       type: "rate_calculated" | "job_priced" | "margin_warning"
+ *             | "price_overridden",
+ *       data: { ...all relevant cents/bp values }
+ *     }
+ *
+ *   Nothing in this MVP depends on the advisor. All calls are
+ *   fire-and-forget and tolerate a null response.
+ * ************************************************************/
+const TrueRateAdvisor = {
+  enabled: false, // flip when the advisor service is wired up
+  async onEvent(event) {
+    if (!this.enabled) return null;
+    // TODO: send event to the advisor endpoint and return its message.
+    return null;
+  }
+};
+/* ********************* END ADVISOR STUB ********************/
+
+
+/* ============================================================
+   STATE + STORAGE
+   ============================================================ */
+const memStore = {};
+function saveState(key, obj) {
+  try { localStorage.setItem(key, JSON.stringify(obj)); }
+  catch (e) { memStore[key] = JSON.stringify(obj); }
+}
+function loadState(key) {
+  try {
+    const raw = localStorage.getItem(key) ?? memStore[key];
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return memStore[key] ? JSON.parse(memStore[key]) : null;
+  }
+}
+
+let rateInputs = loadState("truerate.inputs") || null;
+let rateResult = loadState("truerate.result") || null;
+let wizardStep = 0;
+let wizardDraft = {};
+
+/* ============================================================
+   WIZARD DEFINITION: one input group per screen
+   ============================================================ */
+const STEPS = [
+  {
+    key: "wages", kind: "money",
+    title: "Your pay for the year",
+    help: "Here is the first shift in thinking: your pay is a cost of the business, not whatever is left over at the end of the month. If you have never set a number, use what your household actually needs for the year. Mortgage, food, family, all of it. Every job you price is going to carry its share of this number from now on.",
+    placeholder: "65,000"
+  },
+  {
+    key: "payrollTaxBp", kind: "payroll",
+    title: "How do you pay yourself?",
+    help: "This decides whether the business owes payroll tax on your pay. Pick the one that matches you.",
+    placeholder: "7.65", defaultValue: "7.65"
+  },
+  {
+    key: "workersComp", kind: "money",
+    title: "Workers comp insurance",
+    help: "What you pay for workers comp for the year. It is on your policy. This one swings a lot by trade and by state, so use your real number. Put zero if you do not carry it.",
+    placeholder: "4,500"
+  },
+  {
+    key: "liability", kind: "money",
+    title: "Liability insurance",
+    help: "What you pay for the year for the insurance that covers you if something goes wrong on a job. It is on your policy paperwork.",
+    placeholder: "2,000"
+  },
+  {
+    key: "vehicle", kind: "money",
+    title: "Your truck",
+    help: "Everything the truck costs you in a year: gas, insurance, the payment, tires, repairs. A close guess is fine to start. You can tighten it up later.",
+    placeholder: "14,000"
+  },
+  {
+    key: "tools", kind: "money",
+    title: "Tools and equipment",
+    help: "What you spend on tools and equipment in a normal year. Count replacements. For big purchases, spread the cost over the years you will use them.",
+    placeholder: "3,500"
+  },
+  {
+    key: "overhead", kind: "money",
+    title: "Keeping the doors open",
+    help: "The stuff that costs money whether you work or not: shop or storage, phone, software, bookkeeping, licenses. None of it shows up on a single job, but every job has to help pay for it.",
+    placeholder: "9,000"
+  },
+  {
+    key: "billableHours", kind: "hours",
+    title: "Hours you can bill in a year",
+    help: "Hours a customer actually pays for. Not hours worked. Driving, quoting, picking up parts, and paperwork do not count. Most one-truck owners land between 1,000 and 1,400. Be honest here. A high guess makes every number after this one lie to you.",
+    placeholder: "1,200"
+  },
+  {
+    key: "targetMarginBp", kind: "margin",
+    title: "How much of each job should you keep?",
+    help: "Out of every dollar a customer pays you, some goes to labor and parts. The rest stays with the business. That share pays for slow months, surprise truck repairs, and your future. If you have never picked a number, do not sweat it. Pick one below and you can change it any time."
+  }
+];
+
+const MARGIN_PRESETS = [
+  { bp: 5000, title: "Keep 50 cents of every dollar", sub: "Safe. Covers your costs with a little breathing room." },
+  { bp: 5500, title: "Keep 55 cents of every dollar", sub: "Healthy. Where most solid one-truck service businesses live.", recommended: true },
+  { bp: 6000, title: "Keep 60 cents of every dollar", sub: "Strong. Builds savings and gives you room to grow." }
+];
+
+/* ============================================================
+   RENDERING
+   ============================================================ */
+const viewRate = document.getElementById("view-rate");
+const viewJob  = document.getElementById("view-job");
+
+function showTab(name) {
+  document.getElementById("tab-rate").classList.toggle("active", name === "rate");
+  document.getElementById("tab-job").classList.toggle("active", name === "job");
+  viewRate.hidden = name !== "rate";
+  viewJob.hidden  = name !== "job";
+  if (name === "rate") renderRateTab();
+  else renderJobTab();
+  window.scrollTo(0, 0);
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+}
+
+/* ---------- RATE TAB ---------- */
+let wizardActive = false;
+
+function renderRateTab() {
+  if (wizardActive) { renderWizardStep(); return; }
+  if (rateResult) { renderRateResult(); return; }
+  viewRate.innerHTML = `
+    <div class="card">
+      <h1>What should you actually be charging?</h1>
+      <p class="help">Most owners price from gut feel and what the guy down the road charges. It works until it quietly stops working.</p>
+      <p class="help">This takes about three minutes. Nine quick questions about what your business really costs to run. At the end you get two numbers: what one hour of your work truly costs you, and the least you should charge for it.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="startWizard()">Find my rate</button>
+      </div>
+      <p class="note">Grab last year's numbers if you have them. Close guesses are fine. A rough honest number beats a precise wrong one.</p>
+    </div>`;
+}
+
+function startWizard() {
+  wizardActive = true;
+  wizardStep = 0;
+  wizardDraft = rateInputs ? { ...rateInputs } : {};
+  renderWizardStep();
+}
+
+function draftDisplayValue(step) {
+  const v = wizardDraft[step.key];
+  if (v === undefined || v === null) return step.defaultValue || "";
+  if (step.kind === "money")   return (v / 100).toString();
+  if (step.kind === "percent") return (v / 100).toString();
+  return v.toString();
+}
+
+function renderWizardStep() {
+  const step = STEPS[wizardStep];
+  const bars = STEPS.map((_, i) => `<i class="${i <= wizardStep ? "done" : ""}"></i>`).join("");
+
+  if (step.kind === "payroll") {
+    viewRate.innerHTML = `
+      <div class="card">
+        <div class="progress">${bars}</div>
+        <div class="step-label">Step ${wizardStep + 1} of ${STEPS.length}</div>
+        <h2>${esc(step.title)}</h2>
+        <p class="help">${esc(step.help)}</p>
+        <button class="pick recommended" onclick="selectPayroll(0)">
+          <span class="badge">Most common</span>
+          <span class="pick-title">I take money out when I need it</span>
+          <div class="pick-sub">A draw, not a paycheck. The business pays no payroll tax on it. Your taxes get handled on your personal return, so we will not count them twice here.</div>
+        </button>
+        <button class="pick" onclick="togglePayrollInput()">
+          <span class="pick-title">I run payroll and get a real paycheck</span>
+          <div class="pick-sub">The business pays payroll tax on top of your wages. For most that is 7.65 percent.</div>
+        </button>
+        <div id="payroll-custom" hidden>
+          <div class="input-wrap">
+            <input id="step-input" class="big has-suffix" type="text" inputmode="decimal" placeholder="7.65" value="7.65">
+            <span class="suffix">%</span>
+          </div>
+          <div class="field-error" id="step-error"></div>
+          <button class="btn btn-primary" onclick="nextStep()">Next</button>
+        </div>
+        <button class="btn btn-ghost" onclick="prevStep()">Back</button>
+      </div>`;
+    return;
+  }
+
+  if (step.kind === "margin") {
+    const picks = MARGIN_PRESETS.map(p => `
+      <button class="pick ${p.recommended ? "recommended" : ""}" onclick="selectMargin(${p.bp})">
+        ${p.recommended ? '<span class="badge">Most pick this</span>' : ""}
+        <span class="pick-title">${esc(p.title)}</span>
+        <div class="pick-sub">${esc(p.sub)}</div>
+      </button>`).join("");
+    viewRate.innerHTML = `
+      <div class="card">
+        <div class="progress">${bars}</div>
+        <div class="step-label">Step ${wizardStep + 1} of ${STEPS.length}</div>
+        <h2>${esc(step.title)}</h2>
+        <p class="help">${esc(step.help)}</p>
+        ${picks}
+        <button class="pick" onclick="toggleCustomMargin()">
+          <span class="pick-title">I have my own number</span>
+          <div class="pick-sub">Type in the share you want to keep.</div>
+        </button>
+        <div id="custom-margin" hidden>
+          <div class="input-wrap">
+            <input id="step-input" class="big has-suffix" type="text" inputmode="decimal" placeholder="55">
+            <span class="suffix">%</span>
+          </div>
+          <div class="field-error" id="step-error"></div>
+          <button class="btn btn-primary" onclick="nextStep()">Show my rate</button>
+        </div>
+        <button class="btn btn-ghost" onclick="prevStep()">Back</button>
+      </div>`;
+    return;
+  }
+
+  const isMoney = step.kind === "money";
+  const isPct = step.kind === "percent";
+  viewRate.innerHTML = `
+    <div class="card">
+      <div class="progress">${bars}</div>
+      <div class="step-label">Step ${wizardStep + 1} of ${STEPS.length}</div>
+      <h2>${esc(step.title)}</h2>
+      <p class="help">${esc(step.help)}</p>
+      <div class="input-wrap">
+        ${isMoney ? '<span class="prefix">$</span>' : ""}
+        <input id="step-input" class="big ${isMoney ? "has-prefix" : ""} ${isPct ? "has-suffix" : ""}"
+               type="text" inputmode="decimal" autocomplete="off"
+               placeholder="${esc(step.placeholder)}"
+               value="${esc(draftDisplayValue(step))}">
+        ${isPct ? '<span class="suffix">%</span>' : ""}
+      </div>
+      <div class="field-error" id="step-error"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="nextStep()">Next</button>
+        ${wizardStep > 0 ? '<button class="btn btn-ghost" onclick="prevStep()">Back</button>'
+                         : '<button class="btn btn-ghost" onclick="cancelWizard()">Cancel</button>'}
+      </div>
+    </div>`;
+  const input = document.getElementById("step-input");
+  input.focus();
+  input.addEventListener("keydown", e => { if (e.key === "Enter") nextStep(); });
+}
+
+function toggleCustomMargin() {
+  const box = document.getElementById("custom-margin");
+  box.hidden = !box.hidden;
+  if (!box.hidden) document.getElementById("step-input").focus();
+}
+
+function selectPayroll(bp) {
+  wizardDraft.payrollTaxBp = bp;
+  wizardStep++;
+  renderWizardStep();
+}
+
+function togglePayrollInput() {
+  const box = document.getElementById("payroll-custom");
+  box.hidden = !box.hidden;
+  if (!box.hidden) document.getElementById("step-input").focus();
+}
+
+function selectMargin(bp) {
+  wizardDraft.targetMarginBp = bp;
+  finishWizard();
+}
+
+function validateStep(step, raw) {
+  if (step.kind === "money") {
+    const cents = dollarsToCents(raw);
+    if (isNaN(cents)) return { err: "Enter a dollar amount, numbers only. Zero is fine if this one does not apply to you." };
+    return { value: cents };
+  }
+  if (step.kind === "percent" || step.kind === "margin" || step.kind === "payroll") {
+    const bp = percentToBp(raw);
+    if (isNaN(bp)) return { err: "Enter a number, like 7.65 or 55." };
+    if (step.kind === "margin") {
+      if (bp <= 0) return { err: "The share you keep needs to be above zero, or every job just breaks even." };
+      if (bp > MAX_TARGET_MARGIN_BP) return { err: "Keep it at 75 or below. Above that, the math stops matching real service work." };
+    }
+    if (step.key === "payrollTaxBp" && bp > 2500) return { err: "That looks too high for payroll tax. Most owners are near 7.65. Double check it." };
+    return { value: bp };
+  }
+  const clean = String(raw).replace(/[,\s]/g, "");
+  const n = parseFloat(clean);
+  if (!/^\d*\.?\d*$/.test(clean) || isNaN(n)) return { err: "Enter your hours as a number, like 1200." };
+  if (n <= 0) return { err: "Hours need to be above zero. Not sure? 1,200 is a fair starting point for one truck." };
+  if (n > 3000) return { err: "There are not that many billable hours in a year for one truck. Check the number." };
+  return { value: n };
+}
+
+function nextStep() {
+  const step = STEPS[wizardStep];
+  const raw = document.getElementById("step-input").value;
+  const res = validateStep(step, raw === "" && step.defaultValue ? step.defaultValue : raw);
+  if (res.err) { document.getElementById("step-error").textContent = res.err; return; }
+  wizardDraft[step.key] = res.value;
+  if (wizardStep < STEPS.length - 1) { wizardStep++; renderWizardStep(); }
+  else finishWizard();
+}
+function prevStep() { wizardStep--; renderWizardStep(); }
+function cancelWizard() { wizardActive = false; renderRateTab(); }
+
+function finishWizard() {
+  rateInputs = { ...wizardDraft };
+  const totalCents = totalLoadedCostCents(rateInputs);
+  const loadedRateCents = loadedHourlyRateCents(totalCents, rateInputs.billableHours);
+  const minRateCents = minBillableRateCents(loadedRateCents, rateInputs.targetMarginBp);
+  rateResult = { totalCents, loadedRateCents, minRateCents };
+  saveState("truerate.inputs", rateInputs);
+  saveState("truerate.result", rateResult);
+  wizardActive = false;
+  TrueRateAdvisor.onEvent({ type: "rate_calculated", data: { ...rateInputs, ...rateResult } });
+  renderRateResult();
+}
+
+function renderRateResult() {
+  const r = rateResult, c = rateInputs;
+  const tax = payrollTaxCents(c.wages, c.payrollTaxBp);
+  viewRate.innerHTML = `
+    <div class="ticket">
+      <div class="ticket-head"><span>Your numbers</span><span class="stamp">TrueRate</span></div>
+      <div class="ticket-body">
+        <div class="rate-line">
+          <div class="rate-label">What one hour really costs you</div>
+          <div class="rate-value">${fmtCents(r.loadedRateCents)}<small> /hr</small></div>
+          <p class="help">Before you make a dime, every hour you bill costs this much. Your pay, the truck, insurance, all of it, split across your billable hours.</p>
+        </div>
+        <div class="ticket-perf"></div>
+        <div class="rate-line">
+          <div class="rate-label">The least you should charge per hour</div>
+          <div class="rate-value">${fmtCents(r.minRateCents)}<small> /hr</small></div>
+          <p class="help">Charge this and you keep ${fmtBpCents(c.targetMarginBp)} of every dollar after costs. Yes, it is about double your cost. To keep half of every dollar, the price has to be double the cost. That is just how the math works, and it trips up almost everyone.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Where that hourly cost comes from</h2>
+      <table class="breakdown">
+        <tr><td>Your pay</td><td>${fmtCents(c.wages)}</td></tr>
+        ${tax > 0 ? `<tr><td>Payroll tax (${fmtBp(c.payrollTaxBp)})</td><td>${fmtCents(tax)}</td></tr>` : ""}
+        <tr><td>Workers comp</td><td>${fmtCents(c.workersComp)}</td></tr>
+        <tr><td>Liability insurance</td><td>${fmtCents(c.liability)}</td></tr>
+        <tr><td>Your truck</td><td>${fmtCents(c.vehicle)}</td></tr>
+        <tr><td>Tools and equipment</td><td>${fmtCents(c.tools)}</td></tr>
+        <tr><td>Keeping the doors open</td><td>${fmtCents(c.overhead)}</td></tr>
+        <tr class="total"><td>Total for the year</td><td>${fmtCents(r.totalCents)}</td></tr>
+        <tr class="total"><td>Hours you can bill</td><td>${c.billableHours.toLocaleString("en-US")}</td></tr>
+      </table>
+      <p class="note">Notice your pay is the biggest line up there. That is on purpose. Most owners leave their own pay out and take whatever is left. From here on, every job you price carries its share of paying you. That is how it should have worked all along.</p>
+      <p class="note">If your current rate is lower than the number above, nothing is wrong with you. You set your rate before anyone showed you this math. Now you have it.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="showTab('job')">Price a job with this rate</button>
+        <button class="btn btn-ghost" onclick="startWizard()">Change my numbers</button>
+      </div>
+    </div>`;
+}
+
+/* ---------- JOB TAB ---------- */
+const JOB_TYPES = ["Service call", "Repair", "Installation", "Maintenance", "Emergency call", "Other"];
+let lastJob = null;
+let jobMode = "build"; // "build" | "check" | "flat"
+
+function setJobMode(mode) {
+  jobMode = mode;
+  renderJobTab();
+}
+
+function jobInputsHtml(j) {
+  return `
+    <div class="field" style="margin-top:4px">
+      <label for="job-type">What kind of job is it?</label>
+      <select id="job-type" class="big">
+        ${JOB_TYPES.map(t => `<option ${j && j.type === t ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+    </div>
+    <div class="field">
+      <label for="job-hours">About how long does this job take you?</label>
+      <div class="input-wrap" style="margin:0">
+        <input id="job-hours" class="big has-suffix" type="text" inputmode="decimal" placeholder="3.5" value="${j ? j.hours : ""}">
+        <span class="suffix">hrs</span>
+      </div>
+    </div>
+    <div class="field">
+      <label for="job-materials">What the parts will cost you</label>
+      <div class="input-wrap" style="margin:0">
+        <span class="prefix">$</span>
+        <input id="job-materials" class="big has-prefix" type="text" inputmode="decimal" placeholder="240" value="${j ? (j.materialsCents / 100) : ""}">
+      </div>
+      <p class="help" style="margin-top:7px">Use today's supplier prices, not what you paid last time. Parts prices move, and old numbers quietly eat what you keep.</p>
+    </div>`;
+}
+
+function renderJobTab() {
+  if (!rateResult) {
+    viewJob.innerHTML = `
+      <div class="card locked">
+        <div class="icon">&#128274;</div>
+        <h2>First, find your rate</h2>
+        <p class="help">Job prices here get built on what your work really costs you. That takes three minutes on the first tab, one time. After that, every job price stands on solid ground instead of a guess.</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="showTab('rate')">Find my rate</button>
+        </div>
+      </div>`;
+    return;
+  }
+  const j = lastJob;
+  const seg = `
+    <div class="seg">
+      <button class="${jobMode === "build" ? "active" : ""}" onclick="setJobMode('build')">Build a price</button>
+      <button class="${jobMode === "check" ? "active" : ""}" onclick="setJobMode('check')">Check a price</button>
+      <button class="${jobMode === "flat" ? "active" : ""}" onclick="setJobMode('flat')">Flat rate</button>
+    </div>`;
+
+  let body;
+  if (jobMode === "build") {
+    body = `
+      <h2>Build a price from scratch</h2>
+      <p class="lead-note">Tell me the job. I will hand you the price that protects what you keep.</p>
+      ${jobInputsHtml(j)}
+      <div class="field-error" id="job-error"></div>
+      <button class="btn btn-primary" onclick="priceJob('build')">Build my price</button>`;
+  } else if (jobMode === "check") {
+    body = `
+      <h2>Check a price you have in mind</h2>
+      <p class="lead-note">Got a number for this one job already? Put it in and I will tell you straight if it is a good call.</p>
+      <div class="field" style="margin-top:4px">
+        <label for="check-price">What are you thinking of charging?</label>
+        <div class="input-wrap" style="margin:0">
+          <span class="prefix">$</span>
+          <input id="check-price" class="big has-prefix" type="text" inputmode="decimal" placeholder="450">
+        </div>
+      </div>
+      ${jobInputsHtml(j)}
+      <div class="field-error" id="job-error"></div>
+      <button class="btn btn-primary" onclick="priceJob('check')">Tell me if it is a good call</button>`;
+  } else {
+    body = `
+      <h2>Your flat rate for this job</h2>
+      <p class="lead-note">A lot of owners price by the job, not the hour. A water heater is a water heater. Put in what you charge for it and I will work backward to show you what that price is really earning you.</p>
+      <div class="field" style="margin-top:4px">
+        <label for="check-price">Your set price for this kind of job</label>
+        <div class="input-wrap" style="margin:0">
+          <span class="prefix">$</span>
+          <input id="check-price" class="big has-prefix" type="text" inputmode="decimal" placeholder="450">
+        </div>
+      </div>
+      <p class="lead-note">Two quick things so I can check it:</p>
+      ${jobInputsHtml(j)}
+      <div class="field-error" id="job-error"></div>
+      <button class="btn btn-primary" onclick="priceJob('flat')">Show me what it really earns</button>`;
+  }
+
+  viewJob.innerHTML = `<div class="card">${seg}${body}</div><div id="job-result"></div>`;
+}
+
+function priceJob(mode) {
+  const type = document.getElementById("job-type").value;
+  const hoursRaw = document.getElementById("job-hours").value.replace(/[,\s]/g, "");
+  const hours = parseFloat(hoursRaw);
+  const materialsCents = dollarsToCents(document.getElementById("job-materials").value || "0");
+  const errEl = document.getElementById("job-error");
+  if (!/^\d*\.?\d*$/.test(hoursRaw) || isNaN(hours) || hours <= 0) {
+    errEl.textContent = "Enter the hours as a number above zero, like 3 or 3.5."; return;
+  }
+  if (isNaN(materialsCents)) {
+    errEl.textContent = "Enter the parts cost in dollars, numbers only. Zero is fine."; return;
+  }
+  // check and flat are both reverse math: the owner gives the price, we grade it.
+  const reverse = (mode === "check" || mode === "flat");
+  let theirPriceCents = null;
+  if (reverse) {
+    theirPriceCents = dollarsToCents(document.getElementById("check-price").value);
+    if (isNaN(theirPriceCents) || theirPriceCents <= 0) {
+      errEl.textContent = mode === "flat"
+        ? "Enter your flat price for this job, in dollars."
+        : "Enter the price you had in mind, in dollars.";
+      return;
+    }
+  }
+  errEl.textContent = "";
+  const marginBp = rateInputs.targetMarginBp;
+  const costCents = jobCostCents(materialsCents, hours, rateResult.loadedRateCents);
+  const priceCents = jobPriceCents(materialsCents, hours, rateResult.loadedRateCents, marginBp);
+  lastJob = { type, hours, materialsCents, costCents, priceCents };
+  TrueRateAdvisor.onEvent({ type: "job_priced", data: { ...lastJob, marginBp, mode } });
+  renderJobResult(reverse ? theirPriceCents : priceCents, mode);
+  document.getElementById("job-result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderJobResult(currentPriceCents, mode) {
+  const j = lastJob;
+  const reverse = mode === "check" || mode === "flat";
+  const isFlat = mode === "flat";
+  const laborCents = Math.round(j.hours * rateResult.loadedRateCents);
+  const actualMarginBp = grossMarginBp(currentPriceCents, j.costCents);
+  const profitCents = currentPriceCents - j.costCents;
+  const below = actualMarginBp < MARGIN_WARNING_THRESHOLD_BP;
+
+  let statusHtml;
+  if (profitCents <= 0) {
+    statusHtml = `
+      <div class="status warn">
+        <strong>This price pays everyone but you</strong>
+        The job costs you ${fmtCents(j.costCents)} to deliver, counting your pay, the truck, and parts. At this price ${profitCents < 0 ? "you lose " + fmtCents(-profitCents) + " doing the work" : "you break exactly even, which means the business earns nothing for taking the risk"}. The price that protects you is ${fmtCents(j.priceCents)}.
+      </div>`;
+    TrueRateAdvisor.onEvent({ type: "margin_warning", data: { ...j, currentPriceCents, actualMarginBp } });
+  } else if (below) {
+    const fixPriceCents = jobPriceCents(j.materialsCents, j.hours, rateResult.loadedRateCents, MARGIN_WARNING_THRESHOLD_BP);
+    statusHtml = `
+      <div class="status warn">
+        <strong>Not a strong business decision at this number</strong>
+        You keep ${fmtBpCents(actualMarginBp)} of every dollar after labor and parts. That feels fine until the truck needs tires or a slow month shows up. For service work you want to keep at least 45 cents of every dollar, which puts this job at ${fmtCents(fixPriceCents)} or better. The price that hits your full target is ${fmtCents(j.priceCents)}. Plenty of owners price low to keep the phone ringing. Now you can see what it actually costs you.
+      </div>`;
+    TrueRateAdvisor.onEvent({ type: "margin_warning", data: { ...j, currentPriceCents, actualMarginBp } });
+  } else {
+    statusHtml = `
+      <div class="status good">
+        <strong>${reverse ? (isFlat ? "Your flat rate is earning its keep" : "Your number is a solid business decision") : "This price holds up"}</strong>
+        You keep ${fmtBpCents(actualMarginBp)} of every dollar on this job after labor and parts. That share pays for slow weeks, truck repairs, and your future. ${reverse && currentPriceCents < j.priceCents ? "Worth knowing: the price that hits your full target is " + fmtCents(j.priceCents) + ", so there is room above you if you want it." : "This price has a foundation under it."}
+      </div>`;
+  }
+
+  const quote = buildCustomerQuote(j, currentPriceCents);
+
+  document.getElementById("job-result").innerHTML = `
+    <div class="ticket">
+      <div class="ticket-head"><span>${esc(j.type)}</span><span class="stamp">${reverse ? (isFlat ? "Flat rate check" : "Price check") : "Your price"}</span></div>
+      <div class="ticket-body">
+        <div class="rate-line">
+          <div class="rate-label">${reverse ? (isFlat ? "Your flat rate" : "The price you had in mind") : "Charge this"}</div>
+          <div class="rate-value">${fmtCents(currentPriceCents)}</div>
+        </div>
+        <div class="ticket-perf"></div>
+        <table class="breakdown">
+          <tr><td>Labor (${j.hours} hrs at your real cost)</td><td>${fmtCents(laborCents)}</td></tr>
+          <tr><td>Parts</td><td>${fmtCents(j.materialsCents)}</td></tr>
+          <tr><td>What this job costs you</td><td>${fmtCents(j.costCents)}</td></tr>
+          <tr class="total"><td>What you keep</td><td>${fmtCents(profitCents)}</td></tr>
+          <tr class="total"><td>Out of every dollar, you keep</td><td>${profitCents <= 0 ? "nothing" : fmtBpCents(actualMarginBp)}</td></tr>
+        </table>
+        ${statusHtml}
+        ${reverse ? `<div class="btn-row"><button class="btn btn-primary" onclick="useTargetPrice()">Show me the price that protects me</button></div>` : ""}
+        <div class="field" style="margin-top:18px">
+          <label for="override-price">Want to try another number? Type it in and check it the same way.</label>
+          <div class="input-wrap" style="margin:0">
+            <span class="prefix">$</span>
+            <input id="override-price" class="big has-prefix" type="text" inputmode="decimal" placeholder="${(currentPriceCents / 100).toFixed(2)}">
+          </div>
+          <button class="btn btn-ghost" onclick="overridePrice()">Run the numbers on it</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Words for your customer</h2>
+      <p class="help">Lead with what they get and what they avoid. The price comes last, after the value is clear. Parts stay named plainly, because honest language is what keeps customers calling you back.</p>
+      <div class="quote-box">${esc(quote)}</div>
+    </div>`;
+}
+
+function useTargetPrice() {
+  renderJobResult(lastJob.priceCents, "build");
+  document.getElementById("job-result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Customer-facing language: value first, loss framing second,
+// price last. Parts stay named plainly, never renamed.
+function buildCustomerQuote(j, priceCents) {
+  return j.type + " for your home\n\n"
+    + "What you get:\n"
+    + "- The problem fixed right the first time, by a pro who does this every day\n"
+    + "- Quality parts, named plainly on your invoice so you know exactly what went in\n"
+    + "- Our workmanship guarantee, so if it is not right, we make it right\n\n"
+    + "What you avoid:\n"
+    + "- The repeat visits and bigger repair bills that come with a patch job\n"
+    + "- Surprise charges. The price below is the full price.\n\n"
+    + "Your total: " + fmtCents(priceCents);
+}
+
+function overridePrice() {
+  const cents = dollarsToCents(document.getElementById("override-price").value);
+  if (isNaN(cents) || cents <= 0) return;
+  TrueRateAdvisor.onEvent({ type: "price_overridden", data: { ...lastJob, overrideCents: cents } });
+  renderJobResult(cents, "check");
+  document.getElementById("job-result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ---------- boot ---------- */
+renderRateTab();
+</script>
+</body>
+</html>
