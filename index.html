@@ -321,6 +321,55 @@ select.big {
 }
 .locked { text-align: center; padding: 36px 20px; }
 .locked .icon { font-size: 34px; margin-bottom: 10px; }
+.bottomnav {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+.bottomnav button {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 9px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.bottomnav button .ic { font-size: 20px; line-height: 1; }
+.bottomnav button.active { color: var(--blueprint); }
+main { padding-bottom: 96px; }
+
+/* customer experience guide */
+.guide { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.guide .q {
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  background: #FBFCFC;
+}
+.guide .q .num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--blueprint); color: #fff; font-weight: 800; font-size: 14px;
+  margin-bottom: 8px;
+}
+.guide .q h3 { font-size: 16px; font-weight: 800; margin-bottom: 5px; }
+.guide .q p { font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+.stars { text-align: center; font-size: 34px; letter-spacing: 4px; color: var(--signature, #C9A84C); margin: 18px 0 4px; }
+.review-cta {
+  display: block; width: 100%; text-align: center; text-decoration: none;
+  background: #C9A84C; color: #16222E; font-weight: 800; font-size: 17px;
+  padding: 16px; border-radius: 12px; margin-top: 6px;
+}
+.review-cta:active { background: #b8983f; }
 .doc-btns { display: flex; gap: 8px; margin-top: 4px; }
 .doc-btns .btn { margin-top: 0; }
 .doc-sheet {
@@ -377,7 +426,17 @@ select.big {
 <main>
   <section id="view-rate" hidden></section>
   <section id="view-job"></section>
+  <section id="view-fivestar" hidden></section>
 </main>
+
+<nav class="bottomnav no-print" id="bottomnav">
+  <button id="nav-job" class="active" onclick="goJob()">
+    <span class="ic">&#128181;</span><span>Price a Job</span>
+  </button>
+  <button id="nav-fivestar" onclick="goFiveStar()">
+    <span class="ic">&#9733;</span><span>Five Star</span>
+  </button>
+</nav>
 
 <script>
 /* ************************************************************
@@ -616,18 +675,82 @@ const MARGIN_PRESETS = [
    ============================================================ */
 const viewRate = document.getElementById("view-rate");
 const viewJob  = document.getElementById("view-job");
+const viewFiveStar = document.getElementById("view-fivestar");
+
+const REVIEW_URL = "https://g.page/r/CRvV4hU5ecgIEBM/review";
+
+function setNav(active) {
+  const nj = document.getElementById("nav-job");
+  const nf = document.getElementById("nav-fivestar");
+  if (nj) nj.classList.toggle("active", active === "job");
+  if (nf) nf.classList.toggle("active", active === "fivestar");
+}
 
 function goJob() {
   viewRate.hidden = true;
+  viewFiveStar.hidden = true;
   viewJob.hidden = false;
+  setNav("job");
   renderJobTab();
   window.scrollTo(0, 0);
 }
 function goRate() {
   viewJob.hidden = true;
+  viewFiveStar.hidden = true;
   viewRate.hidden = false;
+  setNav("job");
   renderRateTab();
   window.scrollTo(0, 0);
+}
+function goFiveStar() {
+  viewJob.hidden = true;
+  viewRate.hidden = true;
+  viewFiveStar.hidden = false;
+  setNav("fivestar");
+  renderFiveStar();
+  window.scrollTo(0, 0);
+}
+
+function renderFiveStar() {
+  viewFiveStar.innerHTML = `
+    <div class="card">
+      <h1>The Five Star Standard</h1>
+      <p class="help">A five star review is earned before the work starts. Show your customer what to expect, give them real choices, and the rating takes care of itself.</p>
+    </div>
+    <div class="card">
+      <h2>Customer Experience Guide</h2>
+      <p class="help">Show this to your customer at the start of the job. It sets expectations and tells them you run a real operation.</p>
+      <div class="guide">
+        <div class="q">
+          <span class="num">1</span>
+          <h3>Inspection</h3>
+          <p>We look at the whole problem first, so nothing gets missed and there are no surprises later.</p>
+        </div>
+        <div class="q">
+          <span class="num">2</span>
+          <h3>Options</h3>
+          <p>You get three clear ways to solve it, not a single take it or leave it price.</p>
+        </div>
+        <div class="q">
+          <span class="num">3</span>
+          <h3>Your Choice</h3>
+          <p>You pick the option that fits your home and your budget. No pressure, your call.</p>
+        </div>
+        <div class="q">
+          <span class="num">4</span>
+          <h3>Get Started</h3>
+          <p>Once you choose, we get to work and do it right the first time.</p>
+        </div>
+      </div>
+      <button class="btn btn-ghost no-print" style="margin-top:16px" onclick="window.print()">Print this guide</button>
+    </div>
+    <div class="card" style="text-align:center">
+      <h2>Happy with the work?</h2>
+      <p class="help">The end of a great job is the moment to ask. One tap takes your customer straight to your Google review page.</p>
+      <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      <a class="review-cta" href="${REVIEW_URL}" target="_blank" rel="noopener">Leave us a 5 star review</a>
+      <p class="note" style="margin-top:14px">Hand your customer the phone on this screen, or send them the link in a text after you leave.</p>
+    </div>`;
 }
 
 function esc(s) {
@@ -1225,7 +1348,7 @@ function renderBizSetup() {
       <button class="btn btn-primary" onclick="saveBiz()">Save and continue</button>
       <button class="btn btn-ghost" onclick="goJob()">Cancel</button>
     </div>`;
-  viewRate.hidden = true; viewJob.hidden = false;
+  viewRate.hidden = true; viewFiveStar.hidden = true; viewJob.hidden = false; setNav("job");
   window.scrollTo(0, 0);
 }
 
@@ -1264,7 +1387,7 @@ function renderCustomerForm() {
       <button class="btn btn-ghost" onclick="goJob()">Cancel</button>
       <p class="note">Want to fix your business name or phone? <a href="#" onclick="renderBizSetup();return false;" style="color:var(--blueprint);font-weight:700;text-decoration:none">Edit business info</a></p>
     </div>`;
-  viewRate.hidden = true; viewJob.hidden = false;
+  viewRate.hidden = true; viewFiveStar.hidden = true; viewJob.hidden = false; setNav("job");
   window.scrollTo(0, 0);
 }
 
@@ -1346,7 +1469,7 @@ function renderDoc(d, intro) {
       ${paidStamp}
       <div class="doc-foot">${esc(intro)}</div>
     </div>`;
-  viewRate.hidden = true; viewJob.hidden = false;
+  viewRate.hidden = true; viewFiveStar.hidden = true; viewJob.hidden = false; setNav("job");
   window.scrollTo(0, 0);
 }
 
