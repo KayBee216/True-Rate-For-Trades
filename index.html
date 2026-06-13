@@ -321,6 +321,45 @@ select.big {
 }
 .locked { text-align: center; padding: 36px 20px; }
 .locked .icon { font-size: 34px; margin-bottom: 10px; }
+.doc-btns { display: flex; gap: 8px; margin-top: 4px; }
+.doc-btns .btn { margin-top: 0; }
+.doc-sheet {
+  background: #fff;
+  color: #16222E;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 26px 24px;
+}
+.doc-sheet .doc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.doc-sheet .biz-name { font-size: 21px; font-weight: 800; }
+.doc-sheet .biz-meta { font-size: 13px; color: var(--ink-soft); margin-top: 2px; line-height: 1.5; }
+.doc-sheet .doc-kind {
+  font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--blueprint); text-align: right;
+}
+.doc-sheet .doc-num { font-size: 13px; color: var(--ink-soft); text-align: right; margin-top: 3px; }
+.doc-sheet .doc-parties { display: flex; justify-content: space-between; margin-top: 22px; font-size: 14px; gap: 16px; }
+.doc-sheet .doc-parties .label { font-weight: 700; color: var(--ink-soft); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 3px; }
+.doc-sheet table.doc-lines { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 15px; }
+.doc-sheet table.doc-lines th {
+  text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--ink-soft); border-bottom: 2px solid var(--ink); padding: 0 0 8px;
+}
+.doc-sheet table.doc-lines th.r, .doc-sheet table.doc-lines td.r { text-align: right; }
+.doc-sheet table.doc-lines td { padding: 10px 0; border-bottom: 1px solid var(--floor); }
+.doc-sheet .doc-total { display: flex; justify-content: space-between; margin-top: 16px; font-size: 20px; font-weight: 800; }
+.doc-sheet .doc-foot { margin-top: 22px; font-size: 13px; color: var(--ink-soft); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 14px; }
+.doc-paid {
+  display: inline-block; margin-top: 12px; border: 2px solid var(--healthy); color: var(--healthy);
+  font-weight: 800; letter-spacing: 2px; text-transform: uppercase; font-size: 14px;
+  padding: 5px 14px; border-radius: 6px; transform: rotate(-4deg);
+}
+@media print {
+  body { background: #fff; padding: 0; }
+  header, .no-print { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .doc-sheet { border: none; border-radius: 0; padding: 0; }
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .card, .ticket { animation: rise .25s ease-out; }
@@ -499,6 +538,9 @@ function loadState(key) {
 
 let rateInputs = loadState("truerate.inputs") || null;
 let rateResult = loadState("truerate.result") || null;
+let bizInfo = loadState("truerate.biz") || null; // { name, phone, license }
+// The price currently shown on the result screen (so document tools print the right one).
+let shownPriceCents = null;
 // Welcome shows only the very first time, or until they have set a rate.
 let hasSeenWelcome = loadState("truerate.seenWelcome") === true;
 let wizardStep = 0;
@@ -1042,6 +1084,7 @@ function runJobPrice(type, hours, materialsCents, theirPriceCents, mode) {
 
 function renderJobResult(currentPriceCents, mode) {
   const j = lastJob;
+  shownPriceCents = currentPriceCents;
   const reverse = mode === "check" || mode === "flat";
   const isFlat = mode === "flat";
   const laborCents = Math.round(j.hours * rateResult.loadedRateCents);
@@ -1107,6 +1150,15 @@ function renderJobResult(currentPriceCents, mode) {
       <h2>Words for your customer</h2>
       <p class="help">Lead with what they get and what they avoid. The price comes last, after the value is clear. Parts stay named plainly, because honest language is what keeps customers calling you back.</p>
       <div class="quote-box">${esc(quote)}</div>
+    </div>
+    <div class="card">
+      <h2>Turn this into a document</h2>
+      <p class="help">Make it official and hand it to your customer on the spot. Print it, save a PDF, or email it.</p>
+      <div class="doc-btns">
+        <button class="btn btn-ghost" onclick="startDoc('estimate')">Estimate</button>
+        <button class="btn btn-ghost" onclick="startDoc('invoice')">Invoice</button>
+        <button class="btn btn-ghost" onclick="startDoc('receipt')">Receipt</button>
+      </div>
     </div>`;
 }
 
@@ -1136,6 +1188,200 @@ function overridePrice() {
   renderJobResult(cents, "check");
   document.getElementById("job-result").scrollIntoView({ behavior: "smooth", block: "start" });
 }
+
+/* ************************************************************
+ *   DOCUMENTS: estimate / invoice / receipt
+ *   Generates a printable document the owner can hand to a
+ *   customer on the spot (print, save as PDF, or email).
+ * ************************************************************/
+
+const DOC_LABELS = { estimate: "Estimate", invoice: "Invoice", receipt: "Receipt" };
+let docDraft = null; // { kind }
+
+function startDoc(kind) {
+  docDraft = { kind };
+  if (!bizInfo) { renderBizSetup(); return; }
+  renderCustomerForm();
+}
+
+function renderBizSetup() {
+  viewJob.innerHTML = `
+    <div class="card">
+      <h2>First, your business info</h2>
+      <p class="help">This goes at the top of every document you send. You only set it once.</p>
+      <div class="field" style="margin-top:14px">
+        <label for="biz-name">Business name</label>
+        <input id="biz-name" class="big" type="text" autocomplete="organization" placeholder="Your business" value="${bizInfo ? esc(bizInfo.name) : ""}" style="font-size:20px">
+      </div>
+      <div class="field">
+        <label for="biz-phone">Phone</label>
+        <input id="biz-phone" class="big" type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 123 4567" value="${bizInfo ? esc(bizInfo.phone) : ""}" style="font-size:20px">
+      </div>
+      <div class="field">
+        <label for="biz-license">License number (optional)</label>
+        <input id="biz-license" class="big" type="text" placeholder="Leave blank if none" value="${bizInfo ? esc(bizInfo.license) : ""}" style="font-size:20px">
+      </div>
+      <div class="field-error" id="biz-error"></div>
+      <button class="btn btn-primary" onclick="saveBiz()">Save and continue</button>
+      <button class="btn btn-ghost" onclick="goJob()">Cancel</button>
+    </div>`;
+  viewRate.hidden = true; viewJob.hidden = false;
+  window.scrollTo(0, 0);
+}
+
+function saveBiz() {
+  const name = document.getElementById("biz-name").value.trim();
+  const phone = document.getElementById("biz-phone").value.trim();
+  const license = document.getElementById("biz-license").value.trim();
+  if (!name) { document.getElementById("biz-error").textContent = "Add your business name so the document has a heading."; return; }
+  bizInfo = { name, phone, license };
+  saveState("truerate.biz", bizInfo);
+  renderCustomerForm();
+}
+
+function renderCustomerForm() {
+  const kind = docDraft.kind;
+  const today = new Date();
+  const dateStr = today.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  viewJob.innerHTML = `
+    <div class="card">
+      <h2>New ${esc(DOC_LABELS[kind].toLowerCase())}</h2>
+      <p class="help">One quick thing and your ${esc(DOC_LABELS[kind].toLowerCase())} is ready.</p>
+      <div class="field" style="margin-top:14px">
+        <label for="cust-name">Customer name</label>
+        <input id="cust-name" class="big" type="text" placeholder="Customer name" style="font-size:20px">
+      </div>
+      <div class="field">
+        <label for="cust-addr">Customer address or phone (optional)</label>
+        <input id="cust-addr" class="big" type="text" placeholder="Leave blank if you want" style="font-size:20px">
+      </div>
+      <div class="field">
+        <label for="doc-date">Date</label>
+        <input id="doc-date" class="big" type="text" value="${esc(dateStr)}" style="font-size:20px">
+      </div>
+      <div class="field-error" id="cust-error"></div>
+      <button class="btn btn-primary" onclick="makeDoc()">Create ${esc(DOC_LABELS[kind].toLowerCase())}</button>
+      <button class="btn btn-ghost" onclick="goJob()">Cancel</button>
+      <p class="note">Want to fix your business name or phone? <a href="#" onclick="renderBizSetup();return false;" style="color:var(--blueprint);font-weight:700;text-decoration:none">Edit business info</a></p>
+    </div>`;
+  viewRate.hidden = true; viewJob.hidden = false;
+  window.scrollTo(0, 0);
+}
+
+function docNumber(kind) {
+  const d = new Date();
+  const stamp = "" + d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0")
+    + "-" + String(d.getHours()).padStart(2, "0") + String(d.getMinutes()).padStart(2, "0");
+  return DOC_LABELS[kind].slice(0, 3).toUpperCase() + "-" + stamp;
+}
+
+function makeDoc() {
+  const name = document.getElementById("cust-name").value.trim();
+  if (!name) { document.getElementById("cust-error").textContent = "Add the customer name for the document."; return; }
+  const addr = document.getElementById("cust-addr").value.trim();
+  const dateStr = document.getElementById("doc-date").value.trim();
+  const kind = docDraft.kind;
+  const j = lastJob;
+  const num = docNumber(kind);
+  const laborCents = Math.round(j.hours * rateResult.loadedRateCents);
+  const total = shownPriceCents;
+
+  // A document shows one honest line for the job and one for parts.
+  // It never renames standard parts and never exposes the owner's internal cost math.
+  const partsCents = j.materialsCents;
+  const serviceCents = total - partsCents; // the customer-facing service line
+  const intro = kind === "estimate"
+    ? "Estimate for the work described below. Good for 30 days."
+    : kind === "invoice"
+    ? "Invoice for work completed. Thank you for your business."
+    : "Receipt. Paid in full. Thank you for your business.";
+
+  const data = { kind, num, name, addr, dateStr, total, serviceCents, partsCents, job: j.type };
+  TrueRateAdvisor.onEvent({ type: "document_created", data });
+  renderDoc(data, intro);
+}
+
+function renderDoc(d, intro) {
+  const b = bizInfo;
+  const bizMeta = [b.phone, b.license ? "License " + b.license : ""].filter(Boolean).map(esc).join("<br>");
+  const paidStamp = d.kind === "receipt" ? `<div class="doc-paid">Paid in full</div>` : "";
+  viewJob.innerHTML = `
+    <div class="card no-print" id="doc-actions">
+      <h2>${esc(DOC_LABELS[d.kind])} ready</h2>
+      <p class="help">Print it, save it as a PDF, or email it to your customer.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="window.print()">Print or save as PDF</button>
+        <button class="btn btn-ghost" onclick="emailDoc()">Email to customer</button>
+        <button class="btn btn-ghost" onclick="sendToCrm()">Send to my CRM</button>
+        <button class="btn btn-ghost" onclick="goJob()">Done</button>
+      </div>
+    </div>
+    <div class="doc-sheet" id="doc-sheet">
+      <div class="doc-top">
+        <div>
+          <div class="biz-name">${esc(b.name)}</div>
+          <div class="biz-meta">${bizMeta}</div>
+        </div>
+        <div>
+          <div class="doc-kind">${esc(DOC_LABELS[d.kind])}</div>
+          <div class="doc-num">${esc(d.num)}</div>
+          <div class="doc-num">${esc(d.dateStr)}</div>
+        </div>
+      </div>
+      <div class="doc-parties">
+        <div>
+          <div class="label">Billed to</div>
+          <div>${esc(d.name)}</div>
+          ${d.addr ? `<div>${esc(d.addr)}</div>` : ""}
+        </div>
+      </div>
+      <table class="doc-lines">
+        <thead><tr><th>Description</th><th class="r">Amount</th></tr></thead>
+        <tbody>
+          <tr><td>${esc(d.job)} (labor)</td><td class="r">${fmtCents(d.serviceCents)}</td></tr>
+          ${d.partsCents > 0 ? `<tr><td>Parts and materials</td><td class="r">${fmtCents(d.partsCents)}</td></tr>` : ""}
+        </tbody>
+      </table>
+      <div class="doc-total"><span>${d.kind === "estimate" ? "Estimated total" : "Total"}</span><span>${fmtCents(d.total)}</span></div>
+      ${paidStamp}
+      <div class="doc-foot">${esc(intro)}</div>
+    </div>`;
+  viewRate.hidden = true; viewJob.hidden = false;
+  window.scrollTo(0, 0);
+}
+
+function emailDoc() {
+  const sheet = document.getElementById("doc-sheet");
+  const d = docDraft;
+  const subject = encodeURIComponent(`${DOC_LABELS[d.kind]} from ${bizInfo.name}`);
+  const body = encodeURIComponent(sheet.innerText.replace(/\n{3,}/g, "\n\n"));
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+}
+
+/* ************************************************************
+ *   GHL CRM INTEGRATION POINT (STUB)
+ *   This is where TrueRate will push the document to the
+ *   owner's GoHighLevel CRM in a later version. Wire the
+ *   endpoint and auth here. For now it confirms locally.
+ * ************************************************************/
+const TrueRateCrm = {
+  enabled: false, // flip when the GHL endpoint is wired up
+  async send(doc) {
+    if (!this.enabled) return { ok: false, reason: "not_connected" };
+    // TODO: POST the document to the GHL CRM endpoint with auth.
+    return { ok: false, reason: "not_implemented" };
+  }
+};
+
+function sendToCrm() {
+  const box = document.getElementById("doc-actions");
+  const msg = document.createElement("p");
+  msg.className = "note";
+  msg.style.marginTop = "12px";
+  msg.textContent = "CRM sending is coming soon. This will drop the document straight into your CRM. For now, print it or email it to your customer.";
+  box.appendChild(msg);
+}
+/* ********************* END CRM STUB ********************/
 
 /* ---------- boot ---------- */
 goJob();
