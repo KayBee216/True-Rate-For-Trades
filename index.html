@@ -321,6 +321,26 @@ select.big {
 }
 .locked { text-align: center; padding: 36px 20px; }
 .locked .icon { font-size: 34px; margin-bottom: 10px; }
+.compare {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #FBFCFC;
+  overflow: hidden;
+}
+.compare summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 15px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--blueprint);
+}
+.compare summary::-webkit-details-marker { display: none; }
+.compare[open] summary { border-bottom: 1px solid var(--line); }
+.compare-body { padding: 14px 15px 16px; }
+.compare-body .breakdown td { font-size: 14px; }
+.compare-body .breakdown td:last-child { font-family: inherit; font-weight: 600; color: var(--ink); }
 .bottomnav {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -543,6 +563,19 @@ function marginToMarkupBp(marginBp) {
   return Math.round(marginBp * 10000 / (10000 - marginBp));
 }
 
+// Markup of an actual price over an actual cost, in basis points.
+// markup = (price - cost) / cost
+function markupBpFromCost(priceCents, costCents) {
+  if (costCents <= 0) return NaN;
+  return Math.round((priceCents - costCents) * 10000 / costCents);
+}
+
+// What a given markup actually leaves you as margin (what you keep), in bp.
+// margin = markup / (1 + markup)
+function markupToMarginBp(markupBp) {
+  return Math.round(markupBp * 10000 / (10000 + markupBp));
+}
+
 /* ************************************************************
  *   END PRICING MATH
  * ************************************************************/
@@ -598,6 +631,13 @@ function loadState(key) {
 let rateInputs = loadState("truerate.inputs") || null;
 let rateResult = loadState("truerate.result") || null;
 let bizInfo = loadState("truerate.biz") || null; // { name, phone, license }
+let leadCaptured = loadState("truerate.lead") || null; // { firstName, lastName, email }
+
+// Lead delivery. For now leads come to you by email. Later, point
+// LEAD_ENDPOINT at a backend (e.g. a Cloudflare Worker calling the GHL
+// API) and submitLead will POST there first, falling back to email.
+const LEAD_ENDPOINT = null;
+const LEAD_EMAIL = "truerateapp@kbtraininggroup.com";
 // The price currently shown on the result screen (so document tools print the right one).
 let shownPriceCents = null;
 // Welcome shows only the very first time, or until they have set a rate.
@@ -686,7 +726,89 @@ function setNav(active) {
   if (nf) nf.classList.toggle("active", active === "fivestar");
 }
 
+function showChrome(show) {
+  const nav = document.getElementById("bottomnav");
+  if (nav) nav.style.display = show ? "" : "none";
+}
+
+// One-time lead gate. Shows before the tool until the person signs in.
+function renderLeadGate() {
+  viewRate.hidden = true;
+  viewFiveStar.hidden = true;
+  viewJob.hidden = false;
+  showChrome(false);
+  viewJob.innerHTML = `
+    <div class="card">
+      <h1>Welcome to TrueRate</h1>
+      <p class="help">The pricing tool that tells you if a job is actually making you money. Tell us where to send your access and you are in.</p>
+      <div class="field" style="margin-top:16px">
+        <label for="lead-first">First name</label>
+        <input id="lead-first" class="big" type="text" autocomplete="given-name" placeholder="First name" style="font-size:20px">
+      </div>
+      <div class="field">
+        <label for="lead-last">Last name</label>
+        <input id="lead-last" class="big" type="text" autocomplete="family-name" placeholder="Last name" style="font-size:20px">
+      </div>
+      <div class="field">
+        <label for="lead-email">Email address</label>
+        <input id="lead-email" class="big" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com" style="font-size:20px">
+      </div>
+      <div class="field-error" id="lead-error"></div>
+      <button class="btn btn-primary" onclick="submitLead()">Get into TrueRate</button>
+      <p class="note">We use this to send your access and helpful tips. No spam.</p>
+    </div>`;
+  window.scrollTo(0, 0);
+}
+
+function submitLead() {
+  const firstName = document.getElementById("lead-first").value.trim();
+  const lastName = document.getElementById("lead-last").value.trim();
+  const email = document.getElementById("lead-email").value.trim();
+  const errEl = document.getElementById("lead-error");
+  if (!firstName) { errEl.textContent = "Add your first name."; return; }
+  if (!lastName) { errEl.textContent = "Add your last name."; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = "Add a valid email address so we can send your access."; return; }
+  errEl.textContent = "";
+  const lead = { firstName, lastName, email, at: new Date().toISOString() };
+  leadCaptured = lead;
+  saveState("truerate.lead", lead);
+  deliverLead(lead);
+  showChrome(true);
+  goJob();
+}
+
+// Sends the lead. Tries the endpoint if one is set, otherwise opens the
+// person's email app addressed to you with the details filled in.
+function deliverLead(lead) {
+  if (LEAD_ENDPOINT) {
+    try {
+      fetch(LEAD_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lead)
+      }).catch(() => emailLead(lead));
+      return;
+    } catch (e) { /* fall through to email */ }
+  }
+  emailLead(lead);
+}
+
+function emailLead(lead) {
+  const subject = encodeURIComponent("New TrueRate lead: " + lead.firstName + " " + lead.lastName);
+  const body = encodeURIComponent(
+    "New TrueRate signup\n\n" +
+    "First name: " + lead.firstName + "\n" +
+    "Last name: " + lead.lastName + "\n" +
+    "Email: " + lead.email + "\n" +
+    "Signed up: " + lead.at + "\n"
+  );
+  // Opens the device mail app addressed to you. The person taps send.
+  window.location.href = "mailto:" + LEAD_EMAIL + "?subject=" + subject + "&body=" + body;
+}
+
 function goJob() {
+  if (!leadCaptured) { renderLeadGate(); return; }
+  showChrome(true);
   viewRate.hidden = true;
   viewFiveStar.hidden = true;
   viewJob.hidden = false;
@@ -703,6 +825,7 @@ function goRate() {
   window.scrollTo(0, 0);
 }
 function goFiveStar() {
+  if (!leadCaptured) { renderLeadGate(); return; }
   viewJob.hidden = true;
   viewRate.hidden = true;
   viewFiveStar.hidden = false;
@@ -1241,6 +1364,25 @@ function renderJobResult(currentPriceCents, mode) {
 
   const quote = buildCustomerQuote(j, currentPriceCents);
 
+  // Markup vs what you keep. Answers the common "should I stop using
+  // my markup calculator" question by showing the two are not the same.
+  const thisMarkupBp = markupBpFromCost(currentPriceCents, j.costCents);
+  const commonMarkups = [2000, 3000, 5000, 10000]; // 20, 30, 50, 100 percent
+  const markupRows = commonMarkups.map(mk =>
+    `<tr><td>Mark up ${fmtBp(mk)} over cost</td><td>keeps you ${fmtBpCents(markupToMarginBp(mk))} of every dollar</td></tr>`
+  ).join("");
+  const markupCompareHtml = profitCents <= 0 ? "" : `
+    <details class="compare">
+      <summary>Wait, what about marking up? &#9662;</summary>
+      <div class="compare-body">
+        <p class="help">If you have been pricing with a markup calculator, you do not have to stop. You just want to know what your markup is really leaving you. They are two different numbers.</p>
+        <p class="help" style="margin-top:8px"><strong>This job:</strong> your price is a ${fmtBp(thisMarkupBp)} markup over what it costs you, and that keeps you ${fmtBpCents(actualMarginBp)} of every dollar.</p>
+        <p class="help" style="margin-top:8px">Here is the trap. A markup always keeps you less than the markup number:</p>
+        <table class="breakdown" style="margin-top:8px">${markupRows}</table>
+        <p class="help" style="margin-top:8px">So marking up 30 percent sounds healthy, but it only keeps you 23 cents on the dollar. TrueRate sets what you keep first, so you are never guessing which side of that gap you landed on.</p>
+      </div>
+    </details>`;
+
   document.getElementById("job-result").innerHTML = `
     <div class="ticket">
       <div class="ticket-head"><span>${esc(j.type)}</span><span class="stamp">${reverse ? (isFlat ? "Flat rate check" : "Price check") : "Your price"}</span></div>
@@ -1258,6 +1400,7 @@ function renderJobResult(currentPriceCents, mode) {
           <tr class="total"><td>Out of every dollar, you keep</td><td>${profitCents <= 0 ? "nothing" : fmtBpCents(actualMarginBp)}</td></tr>
         </table>
         ${statusHtml}
+        ${markupCompareHtml}
         ${reverse ? `<div class="btn-row"><button class="btn btn-primary" onclick="useTargetPrice()">Show me the price that protects me</button></div>` : ""}
         <div class="field" style="margin-top:18px">
           <label for="override-price">Want to try another number? Type it in and check it the same way.</label>
