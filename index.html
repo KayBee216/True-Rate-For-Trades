@@ -636,7 +636,9 @@ let leadCaptured = loadState("truerate.lead") || null; // { firstName, lastName,
 // Lead delivery. For now leads come to you by email. Later, point
 // LEAD_ENDPOINT at a backend (e.g. a Cloudflare Worker calling the GHL
 // API) and submitLead will POST there first, falling back to email.
-const LEAD_ENDPOINT = null;
+// Leads post straight to your GHL inbound webhook. Email is a silent
+// fallback only if the post fails (e.g. no signal on a job site).
+const LEAD_ENDPOINT = "https://services.leadconnectorhq.com/hooks/jcpu3uIoEG7kKgprJYwU/webhook-trigger/cce38536-6fbb-4601-8969-b82155fcc620";
 const LEAD_EMAIL = "truerateapp@kbtraininggroup.com";
 // The price currently shown on the result screen (so document tools print the right one).
 let shownPriceCents = null;
@@ -777,18 +779,30 @@ function submitLead() {
   goJob();
 }
 
-// Sends the lead. Tries the endpoint if one is set, otherwise opens the
-// person's email app addressed to you with the details filled in.
+// The exact shape sent to GHL. These are the field names you map in the
+// workflow: firstName, lastName, email, source, signedUpAt.
+function leadPayload(lead) {
+  return {
+    firstName: lead.firstName,
+    lastName: lead.lastName,
+    email: lead.email,
+    source: "TrueRate App",
+    signedUpAt: lead.at
+  };
+}
+
+// Posts the lead to the GHL webhook. If that fails, falls back to email
+// so a lead is never silently lost.
 function deliverLead(lead) {
   if (LEAD_ENDPOINT) {
     try {
       fetch(LEAD_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(lead)
+        body: JSON.stringify(leadPayload(lead))
       }).catch(() => emailLead(lead));
       return;
-    } catch (e) { /* fall through to email */ }
+    } catch (e) { emailLead(lead); return; }
   }
   emailLead(lead);
 }
